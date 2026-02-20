@@ -28,4 +28,4 @@ idf.py flash
 ---
 ## WiFi Setup Page
 
-![System Architecture](img/wifi_setup_page1.png)![System Architecture](img/wifi_setup_page2.png)
+![System Architecture](img/wifi_setup_page1.jpeg)![System Architecture](img/wifi_setup_page2.jpeg)

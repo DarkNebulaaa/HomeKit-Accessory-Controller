@@ -34,5 +34,6 @@ idf.py flash
 </p>
 
 ## Assembled Board
-
-<img src="img/PCB.png" width="48%">
+<p align="center">
+    <img src="img/PCB.png" width="48%">
+</p>  

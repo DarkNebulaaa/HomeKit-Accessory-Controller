@@ -90,6 +90,7 @@ void led_pwm(void *mode){
 }
 void app_main()
 {   
+    configure_gpio();
     if(i == 0){
     configure_led();
     reset_key_init(RESET_GPIO);

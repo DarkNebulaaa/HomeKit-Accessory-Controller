@@ -74,7 +74,7 @@ static hap_char_t *current_state, *target_state;
 #define SETUP_ID_Watering   "WS01"
 
 /*初始化GPIO*/
-static void configure_gpio(void);
+void configure_gpio(void);
 
 /*初始化重設出廠設置按鈕*/
 void reset_key_init(uint32_t key_gpio_pin);

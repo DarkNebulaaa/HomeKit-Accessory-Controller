@@ -62,7 +62,7 @@ static void led_onoff(bool onoff){
 
 }
 
-static void configure_gpio(){
+void configure_gpio(){
     ESP_LOGI(TAG, "configured GPIO DONE");
     // 車庫門腳位初始化
     gpio_reset_pin(IO_STATE_ZERO);
@@ -623,7 +623,6 @@ static void watering_thread_entry(void *p)
 
 void garage_door_serv()
 {
-    configure_gpio();
     /* Refresh the strip to send data */
     State = get_door_state();
     Priv_State = Moving;
@@ -688,7 +687,6 @@ void garage_door_serv()
 
 void watering_serv()
 {
-    configure_gpio();
     xTaskCreate(watering_thread_entry, WATERING_TASK_NAME, WATERING_TASK_STACKSIZE, NULL, WATERING_TASK_PRIORITY, NULL);
     vTaskDelete(NULL);
 }

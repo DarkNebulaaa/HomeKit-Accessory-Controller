@@ -252,11 +252,19 @@
 
         <label for="pwd">密碼</label>
         <div class="field">
-          <input id="pwd" type="password" placeholder="至少 8 個字元（常見）" autocomplete="current-password" />
+          <input id="pwd" type="password" placeholder="至少 8 個字元（常見）" autocomplete="off" />
           <div class="rightIcon">
             <button class="btn small ghost" id="togglePwd" type="button" aria-label="顯示/隱藏密碼">顯示</button>
           </div>
         </div>
+
+        <label for="devType">設備類型</label>
+          <div class="field">
+            <select id="devType">
+              <option value="grgedoor" selected>車庫門控制器</option>
+              <option value="watering">自動澆水控制器</option>
+            </select>
+          </div>
 
         <div class="status" id="status"></div>
       </div>
@@ -296,6 +304,7 @@
       pwd: document.getElementById('pwd'),
       status: document.getElementById('status'),
       stateText: document.getElementById('stateText'),
+      devType: document.getElementById('devType'),
     };
 
     function setStatus(msg, isErr=false){
@@ -318,6 +327,7 @@
     function updateSaveEnabled(){
       const ssid = (els.ssidInput.value || '').trim();
       const pwd  = els.pwd.value || '';
+      const dev = els.devType.value || '';
       // 開放式網路可能不需要密碼；但一般常見至少 8
       // 這裡做「有 SSID 就能按」，你也可以改成 (pwd.length>=8)
       els.btnSave.disabled = (ssid.length === 0);
@@ -383,7 +393,7 @@
       return await res.json();
     }
 
-    async function apiSave(ssid, password){
+    async function apiSave(ssid, password, dev){
       if (DEMO){
         await new Promise(r=>setTimeout(r, 700));
         return {ok:true};
@@ -391,7 +401,7 @@
       const res = await fetch('/save', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ssid, password})
+        body: JSON.stringify({ssid, password, dev})
       });
       if (!res.ok) throw new Error('save failed');
       return await res.json();
@@ -444,6 +454,7 @@
     els.btnSave.addEventListener('click', async ()=>{
       const ssid = (els.ssidInput.value || '').trim();
       const password = els.pwd.value || '';
+      const dev = els.devType?.value ?? 'grgedoor'; // 預設車庫門控制器
       if (!ssid){
         setStatus('請先選擇或輸入 SSID。', true);
         return;
@@ -453,7 +464,7 @@
       els.btnSave.disabled = true;
 
       try{
-        const ret = await apiSave(ssid, password);
+        const ret = await apiSave(ssid, password, dev);
         // ret 可以由你後端回傳更多資訊，例如 {ok:true, ip:"192.168.1.123"}
         setStatus('已送出設定 ✅ 裝置將嘗試連線，若成功會自動離開此頁。');
         els.stateText.textContent = '已送出設定';
@@ -466,6 +477,14 @@
 
     // init
     updateSaveEnabled();
+// 點空白處收鍵盤（手機超好用）
+    document.addEventListener('click', (e) => {
+    const t = e.target;
+    const isField = t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.closest('input,select,textarea'));
+    if (!isField && document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+    });
   </script>
 </body>
 </html>

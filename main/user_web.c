@@ -137,6 +137,7 @@ static esp_err_t save_post_handler(httpd_req_t *req){
     // 3) 取欄位
     const cJSON *j_ssid = cJSON_GetObjectItemCaseSensitive(root, "ssid");
     const cJSON *j_pwd  = cJSON_GetObjectItemCaseSensitive(root, "password");
+    const cJSON *j_dev  = cJSON_GetObjectItemCaseSensitive(root, "dev");
 
     if (!cJSON_IsString(j_ssid) || (j_ssid->valuestring == NULL)) {
         cJSON_Delete(root);
@@ -147,8 +148,9 @@ static esp_err_t save_post_handler(httpd_req_t *req){
 
     const char *ssid = j_ssid->valuestring;
     const char *pwd  = (cJSON_IsString(j_pwd) && j_pwd->valuestring) ? j_pwd->valuestring : "";
+    const char *dev  = (cJSON_IsString(j_dev) && j_dev->valuestring) ? j_dev->valuestring : "";
 
-    ESP_LOGI(TAG, "Got ssid='%s', pwd=%s", ssid, pwd);
+    ESP_LOGI(TAG, "Got ssid='%s', pwd=%s, dev=%s", ssid, pwd, dev);
 
     // 4) TODO：存 NVS / 嘗試連線（你接這裡）
     // nvs_set_str(..., "ssid", ssid); nvs_set_str(..., "pwd", pwd); nvs_commit(...)
@@ -158,6 +160,7 @@ static esp_err_t save_post_handler(httpd_req_t *req){
     // 5) 回應 JSON
     httpd_resp_sendstr(req, "{\"ok\":true}");
     write_wifi_data(ssid, pwd);
+    write_devType(dev);
     cJSON_Delete(root);
     vTaskDelay(1000 / portTICK_PERIOD_MS); // 等 NVS 寫入完成
     esp_restart();

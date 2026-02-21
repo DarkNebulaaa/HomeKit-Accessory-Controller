@@ -56,19 +56,58 @@
 const char *TAG = "HAP Garage Door";
 int i = 0;
 WifiMode_t RFmode;
-
+void configure_led(void){
+    led_strip_config_t strip_config = {
+        .strip_gpio_num = IO_INDECATOR,
+        .max_leds = 1, // at least one LED on board
+    };
+    led_strip_rmt_config_t rmt_config = {
+        .resolution_hz = 10 * 1000 * 1000, // 10MHz
+        .flags.with_dma = false,
+    };
+    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
+    led_strip_clear(led_strip);
+}
+void led_pwm(void *mode){
+    WifiMode_t *RFmode = (WifiMode_t *)mode;
+    static int direction = 0;
+    static int brightness = 0;
+    while (1){       
+        if (!direction){
+        if (brightness <=100){
+            brightness += 1;
+        } else direction = 1;
+        }if (direction){
+            brightness -= 1;
+            if (brightness <= 0){
+                direction = 0;
+            }
+        }
+    led_strip_set_pixel(led_strip, 0, brightness, brightness/2, 0);
+    led_strip_refresh(led_strip);
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+    }
+}
 void app_main()
 {   
     if(i == 0){
     configure_led();
     reset_key_init(RESET_GPIO);
     nvs_init();
+    char DEVICE_TYPE[16] = {0};
     RFmode = wifi_serv_init();
-    xTaskCreate(led_pwm, "led_pwm", 2048, &RFmode, 1, NULL);
+    if (RFmode == RF_MODE_AP)xTaskCreate(led_pwm, "led_pwm", 2048, &RFmode, 1, NULL);
     i++;
+    
     if (RFmode == RF_MODE_STA) {
-        xTaskCreate(garage_door_serv, "garage_door_serv", 4096, NULL, 5, NULL);
-    }
+        if(read_devType(DEVICE_TYPE, sizeof(DEVICE_TYPE)) != ESP_OK) xTaskCreate(garage_door_serv, "garage_door_serv", 4096, NULL, 5, NULL);
+        else {
+            if (strcmp(DEVICE_TYPE, "grgedoor") == 0) {
+                xTaskCreate(garage_door_serv, "garage_door_serv", 4096, NULL, 5, NULL);
+            }else if (strcmp(DEVICE_TYPE, "watering") == 0) {
+                xTaskCreate(watering_serv, "watering_serv", 4096, NULL, 5, NULL);
+            } 
+        }
+        }
     }
 }
-

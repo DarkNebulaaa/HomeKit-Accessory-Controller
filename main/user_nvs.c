@@ -18,6 +18,21 @@ esp_err_t write_wifi_data(const char *ssid, const char *password){
     nvs_close(write_nvs_handle);
     return ESP_OK;
 }
+esp_err_t write_devType(const char *devType){
+    nvs_handle_t write_nvs_handle;
+    nvs_open("devType", NVS_READWRITE, &write_nvs_handle);
+    nvs_set_str(write_nvs_handle, "NVS_DEV_TYPE", devType);
+    nvs_commit(write_nvs_handle);
+    nvs_close(write_nvs_handle);
+    return ESP_OK;
+}
+esp_err_t read_devType(char *devType, size_t len){
+    nvs_handle_t read_nvs_handle;
+    nvs_open("devType", NVS_READONLY, &read_nvs_handle);
+    esp_err_t err = nvs_get_str(read_nvs_handle, "NVS_DEV_TYPE", devType, &len);
+    nvs_close(read_nvs_handle);
+    return err;
+}
 esp_err_t factory_reset_nvs(void){
     esp_err_t ret = nvs_flash_erase();
     if (ret != ESP_OK) {

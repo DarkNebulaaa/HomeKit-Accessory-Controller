@@ -31,6 +31,10 @@
 #define GARAGE_DOOR_TASK_STACKSIZE 4 * 1024
 #define GARAGE_DOOR_TASK_NAME      "hap_garage_door"
 
+#define WATERING_TASK_PRIORITY  1
+#define WATERING_TASK_STACKSIZE 4 * 1024
+#define WATERING_TASK_NAME      "hap_watering"
+
 //enum
 enum door_cmd {
     Idle = 0,
@@ -54,8 +58,8 @@ static hap_char_t *current_door_state_char;
 static hap_char_t *target_door_state_char;
 
 
-static DoorCmd DoorOperation;
-extern DoorState State, Priv_State;
+
+
 static int state_Changed = 1;
 
 static char server_cert[] = {};
@@ -64,7 +68,8 @@ static hap_char_t *current_state, *target_state;
 
 #define CONFIG_USE_HARDCODED_SETUP_CODE
 #define SETUP_CODE "457-86-921"
-#define SETUP_ID "DO01"
+#define SETUP_ID_GarageDoor "DO01"
+#define SETUP_ID_Watering   "WS01"
 
 #define IO_STATE_ZERO GPIO_NUM_0
 #define IO_STATE_ONE  GPIO_NUM_1
@@ -73,6 +78,7 @@ static hap_char_t *current_state, *target_state;
 #define IO_CTRL_DOWN  GPIO_NUM_5
 #define IO_INDECATOR  GPIO_NUM_7
 #define RESET_GPIO    GPIO_NUM_9
+#define PLUGIN_GPIO   GPIO_NUM_10
 
 /* Reset network credentials if button is pressed for more than 3 seconds and then released */
 #define RESET_NETWORK_BUTTON_TIMEOUT        3
@@ -80,27 +86,30 @@ static hap_char_t *current_state, *target_state;
 /* Reset to factory if button is pressed and held for more than 10 seconds */
 #define RESET_TO_FACTORY_BUTTON_TIMEOUT     10
 
-void configure_led(void);
-/**
- * 指示燈控制任務，AP模式下呼吸燈，STA模式下根據狀態變化顏色
- *@param mode 指示燈模式，AP或STA會有不同的顯示
- */
-void led_pwm(void* mode);
 /*初始化GPIO*/
 static void configure_gpio(void);
+
+/*初始化重設出廠設置按鈕*/
+void reset_key_init(uint32_t key_gpio_pin);
+static void reset_network_handler(void* arg);
+static void reset_to_factory_handler(void* arg);
+
+/*                     車庫門服務                      */
 /*獲取車庫門狀態*/
 DoorState get_door_state(void);
 /*控制車庫門開關*/
 static void ctrl_door(DoorCmd cmd);
-static void reset_network_handler(void* arg);
-static void reset_to_factory_handler(void* arg);
-/*初始化重設出廠設置按鈕*/
-void reset_key_init(uint32_t key_gpio_pin);
-static int garage_door_identify(hap_acc_t *ha);
-static void garage_door_hap_event_handler(void* arg, esp_event_base_t event_base, int32_t event, void *data);
+static void hap_event_handler(void* arg, esp_event_base_t event_base, int32_t event, void *data);
 static int garage_door_read(hap_char_t *hc, hap_status_t *status_code, void *serv_priv, void *read_priv);
 static int garage_door_write(hap_write_data_t write_data[], int count, void *serv_priv, void *write_priv);
 static void garage_door_thread_entry(void *p);
+static int garage_door_identify(hap_acc_t *ha);
 void garage_door_serv();
 
+/*                     澆水系統服務                      */
+static void watering_thread_entry(void *p);
+static int watering_write(hap_write_data_t write_data[], int count, void *serv_priv, void *write_priv);
+static int watering_read(hap_char_t *hc, hap_status_t *status_code, void *serv_priv, void *read_priv);
+static int watering_identify(hap_acc_t *ha);
+void watering_serv();
 #endif

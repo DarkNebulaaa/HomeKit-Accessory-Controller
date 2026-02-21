@@ -5,39 +5,11 @@
 led_strip_handle_t led_strip;
 DoorState State, Priv_State;
 //指示燈初始化
-void configure_led(void){
-    led_strip_config_t strip_config = {
-        .strip_gpio_num = IO_INDECATOR,
-        .max_leds = 1, // at least one LED on board
-    };
-    led_strip_rmt_config_t rmt_config = {
-        .resolution_hz = 10 * 1000 * 1000, // 10MHz
-        .flags.with_dma = false,
-    };
-    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
-    led_strip_clear(led_strip);
-}
 
-void led_pwm(void *mode){
-    WifiMode_t *RFmode = (WifiMode_t *)mode;
+static void garage_door_led(){
     static int direction = 0;
     static int brightness = 0;
-    while (*RFmode == RF_MODE_AP){       
-        if (!direction){
-        if (brightness <=100){
-            brightness += 1;
-        } else direction = 1;
-        }if (direction){
-            brightness -= 1;
-            if (brightness <= 0){
-                direction = 0;
-            }
-        }
-    led_strip_set_pixel(led_strip, 0, brightness, brightness/2, 0);
-    led_strip_refresh(led_strip);
-    vTaskDelay(10 / portTICK_PERIOD_MS);
-    }
-    while(*RFmode == RF_MODE_STA){
+    while(1){
         if (State == Moving){
             if (!direction){
                 brightness += 2;
@@ -66,24 +38,30 @@ void led_pwm(void *mode){
         led_strip_clear(led_strip);
        }
     }
+}
 
-    led_strip_clear(led_strip);
-    vTaskDelete(NULL);
+static void led_blink(uint8_t R, uint8_t G, uint8_t B){
+    for (int i = 0; i <= 10; i++) {
+    led_strip_set_pixel(led_strip, 0, R, G, B);
+    led_strip_refresh(led_strip);   // 亮
+    vTaskDelay(pdMS_TO_TICKS(100));
+
+    led_strip_clear(led_strip);     // 滅
+    vTaskDelay(pdMS_TO_TICKS(100));
+    }
 }
 
 static void configure_gpio(){
     ESP_LOGI(TAG, "configured GPIO DONE");
+    // 車庫門腳位初始化
     gpio_reset_pin(IO_STATE_ZERO);
     gpio_reset_pin(IO_STATE_ONE);
-
     gpio_reset_pin(IO_CTRL_UP);
     gpio_reset_pin(IO_CTRL_STOP);
     gpio_reset_pin(IO_CTRL_DOWN);
 
-    /* Set the GPIO as a push/pull output */
     gpio_set_direction(IO_STATE_ZERO, GPIO_MODE_INPUT);
     gpio_set_direction(IO_STATE_ONE, GPIO_MODE_INPUT);
-
     gpio_set_direction(IO_CTRL_UP, GPIO_MODE_OUTPUT);
     gpio_set_direction(IO_CTRL_STOP, GPIO_MODE_OUTPUT);
     gpio_set_direction(IO_CTRL_DOWN, GPIO_MODE_OUTPUT);
@@ -91,6 +69,12 @@ static void configure_gpio(){
     gpio_set_level(IO_CTRL_UP,   1);
     gpio_set_level(IO_CTRL_STOP, 1);
     gpio_set_level(IO_CTRL_DOWN, 1);
+
+    // 澆水系統腳位初始化
+    gpio_reset_pin(PLUGIN_GPIO);
+    gpio_set_direction(PLUGIN_GPIO, GPIO_MODE_OUTPUT);
+    gpio_set_level(PLUGIN_GPIO, 0);
+
 }
 
 DoorState get_door_state(){
@@ -204,7 +188,14 @@ void reset_key_init(uint32_t key_gpio_pin)
  * In a real accessory, something like LED blink should be implemented
  * got visual identification
  */
+
 static int garage_door_identify(hap_acc_t *ha)
+{
+    ESP_LOGI(TAG, "Accessory identified");
+    return HAP_SUCCESS;
+}
+
+static int watering_identify(hap_acc_t *ha)
 {
     ESP_LOGI(TAG, "Accessory identified");
     return HAP_SUCCESS;
@@ -214,7 +205,7 @@ static int garage_door_identify(hap_acc_t *ha)
  * An optional HomeKit Event handler which can be used to track HomeKit
  * specific events.
  */
-static void garage_door_hap_event_handler(void* arg, esp_event_base_t event_base, int32_t event, void *data)
+static void hap_event_handler(void* arg, esp_event_base_t event_base, int32_t event, void *data)
 {
     switch(event) {
         case HAP_EVENT_PAIRING_STARTED :
@@ -272,13 +263,25 @@ static void garage_door_hap_event_handler(void* arg, esp_event_base_t event_base
     return HAP_SUCCESS;
  }
 
+ static int watering_read(hap_char_t *hc, hap_status_t *status_code, void *serv_priv, void *read_priv){
+    if (hap_req_get_ctrl_id(read_priv)) {
+        ESP_LOGI(TAG, "Read data !! Received read from %s", hap_req_get_ctrl_id(read_priv));
+    }
+    if (!strcmp(hap_char_get_type_uuid(hc), HAP_CHAR_UUID_IN_USE)) {
+        const hap_val_t *cur_val = hap_char_get_val(hc);
+        hap_val_t new_val;
+        new_val.b = gpio_get_level(PLUGIN_GPIO);
+        hap_char_update_val(hc, &new_val);
+        *status_code = HAP_STATUS_SUCCESS;
+    }
+    return HAP_SUCCESS;
+ }
 
 /* A dummy callback for handling a write on the Fan service
  * In an actual accessory, this should also control the hardware.
  */
-static int garage_door_write(hap_write_data_t write_data[], int count,
-        void *serv_priv, void *write_priv)
-{
+static int garage_door_write(hap_write_data_t write_data[], int count, void *serv_priv, void *write_priv){
+    static DoorCmd DoorOperation;
     if (hap_req_get_ctrl_id(write_priv)) {
         ESP_LOGI(TAG, "Write data !!Received write from %s", hap_req_get_ctrl_id(write_priv));
     }
@@ -302,6 +305,34 @@ static int garage_door_write(hap_write_data_t write_data[], int count,
     return ret;
 }
 
+static int watering_write(hap_write_data_t write_data[], int count, void *serv_priv, void *write_priv){
+    if (hap_req_get_ctrl_id(write_priv)) {
+        ESP_LOGI(TAG, "Write data !!Received write from %s", hap_req_get_ctrl_id(write_priv));
+    }
+    ESP_LOGI(TAG, "Watering Write called with %d chars", count);
+    int i, ret = HAP_SUCCESS;
+    hap_write_data_t *write;
+    for (i = 0; i < count; i++) {
+        write = &write_data[i];
+        if (!strcmp(hap_char_get_type_uuid(write->hc), HAP_CHAR_UUID_ACTIVE)) {
+            ESP_LOGI(TAG, "Received Write. Watering state %s",write->val.b ? "On" : "Off");
+            gpio_set_level(PLUGIN_GPIO, write->val.b);
+            hap_char_update_val(write->hc, &(write->val));
+            *(write->status) = HAP_STATUS_SUCCESS;
+        }
+        else if (!strcmp(hap_char_get_type_uuid(write->hc), HAP_CHAR_UUID_IN_USE))
+        {
+            hap_val_t new_val;
+            new_val.b = gpio_get_level(PLUGIN_GPIO);
+            ESP_LOGI(TAG, "Received Write. Watering in use %s",new_val.b ? "Yes" : "No");
+            hap_char_update_val(write->hc, &new_val);
+            *(write->status) = HAP_STATUS_SUCCESS;
+        }
+        
+        
+    }
+    return ret;
+}
 
 /*The main thread for handling the Fan Accessory */
 static void garage_door_thread_entry(void *p)
@@ -319,7 +350,7 @@ static void garage_door_thread_entry(void *p)
 
     /* Initialize the HAP core */
     hap_init(HAP_TRANSPORT_WIFI);
-
+    led_blink(0, 255, 255);
     /* Initialise the mandatory parameters for Accessory which will be added as
      * the mandatory services internally
      */
@@ -347,7 +378,7 @@ static void garage_door_thread_entry(void *p)
     /* Create the Fan Service. Include the "name" since this is a user visible service  */
     service = hap_serv_garage_door_opener_create(1, 1, 0);
     hap_serv_add_char(service, hap_char_name_create("Garage Door"));
-    hap_serv_add_char(service, hap_char_current_door_state_create(0));
+    //hap_serv_add_char(service, hap_char_current_door_state_create(0));
 
     /* Set the write callback for the service */
     hap_serv_set_write_cb(service, garage_door_write);
@@ -401,11 +432,11 @@ static void garage_door_thread_entry(void *p)
     /* Unique Setup code of the format xxx-xx-xxx. Default: 111-22-333 */
     hap_set_setup_code(SETUP_CODE);
     /* Unique four character Setup Id. Default: ES32 */
-    hap_set_setup_id(SETUP_ID);
+    hap_set_setup_id(SETUP_ID_GarageDoor);
 #ifdef CONFIG_APP_WIFI_USE_WAC_PROVISIONING
-    app_hap_setup_payload(SETUP_CODE, SETUP_ID, true, cfg.cid);
+    app_hap_setup_payload(SETUP_CODE, SETUP_ID_GarageDoor, true, cfg.cid);
 #else
-    app_hap_setup_payload(SETUP_CODE, SETUP_ID, false, cfg.cid);
+    app_hap_setup_payload(SETUP_CODE, SETUP_ID_GarageDoor, false, cfg.cid);
 #endif
 #endif
     /* Enable Hardware MFi authentication (applicable only for MFi variant of SDK) */
@@ -417,7 +448,97 @@ static void garage_door_thread_entry(void *p)
     /* Register an event handler for HomeKit specific events.
      * All event handlers should be registered only after app_wifi_init()
      */
-    esp_event_handler_register(HAP_EVENT, ESP_EVENT_ANY_ID, &garage_door_hap_event_handler, NULL);
+    esp_event_handler_register(HAP_EVENT, ESP_EVENT_ANY_ID, &hap_event_handler, NULL);
+
+    /* After all the initializations are done, start the HAP core */
+    hap_start();
+    /* Start Wi-Fi */
+    //app_wifi_start(portMAX_DELAY);
+    /* The task ends here. The read/write callbacks will be invoked by the HAP Framework */
+    vTaskDelay(pdMS_TO_TICKS(1500));
+    xTaskCreate(garage_door_led, "garage_door_led", 2048, NULL, 1, NULL);
+    vTaskDelete(NULL);
+}
+
+static void watering_thread_entry(void *p)
+{
+    hap_acc_t *accessory;
+    hap_serv_t *service;
+
+    /* Configure HomeKit core to make the Accessory name (and thus the WAC SSID) unique,
+     * instead of the default configuration wherein only the WAC SSID is made unique.
+     */
+    hap_cfg_t hap_cfg;
+    hap_get_config(&hap_cfg);
+    hap_cfg.unique_param = UNIQUE_SSID;
+    hap_set_config(&hap_cfg);
+    hap_init(HAP_TRANSPORT_WIFI);
+    led_blink(255, 40, 0);
+
+
+    hap_acc_cfg_t cfg = {
+        .name = "WateringSystem",
+        .manufacturer = "Mason",
+        .model = "Watering System_V2",
+        .serial_num = "114021159",
+        .fw_rev = "1.0.3",
+        .hw_rev = NULL,
+        .pv = "1.1.0",
+        .identify_routine = watering_identify,
+        .cid = HAP_CID_SPRINKLER,
+    };
+
+    /* Create accessory object */
+    accessory = hap_acc_create(&cfg);
+
+    /* Add a dummy Product Data */
+    uint8_t product_data[] = {'E','S','P','3','2','H','A','P'};
+    hap_acc_add_product_data(accessory, product_data, sizeof(product_data));
+
+    /* Add Wi-Fi Transport service required for HAP Spec R16 */
+    hap_acc_add_wifi_transport_service(accessory, 0);
+
+    /* Create the Fan Service. Include the "name" since this is a user visible service  */
+    service = hap_serv_valve_create(0, 0, 1);
+    hap_serv_add_char(service, hap_char_name_create("Watering System"));
+
+    /* Set the write callback for the service */
+    hap_serv_set_write_cb(service, watering_write);
+
+    /* Set the read callback for the service (optional) */
+    hap_serv_set_read_cb(service, watering_read);
+
+    hap_acc_add_serv(accessory, service);
+
+    hap_fw_upgrade_config_t ota_config = {
+        .server_cert_pem = server_cert,
+    };
+    service = hap_serv_fw_upgrade_create(&ota_config);
+    /* Add the service to the Accessory Object */
+    hap_acc_add_serv(accessory, service);
+
+    /* Add the Accessory to the HomeKit Database */
+    hap_add_accessory(accessory);
+
+    ESP_LOGI(TAG, "Accessory is paired with %d controllers",
+                hap_get_paired_controller_count());
+
+
+    hap_set_setup_code(SETUP_CODE);
+    /* Unique four character Setup Id. Default: ES32 */
+    hap_set_setup_id(SETUP_ID_Watering);
+    app_hap_setup_payload(SETUP_CODE, SETUP_ID_Watering, false, cfg.cid);
+
+    /* Enable Hardware MFi authentication (applicable only for MFi variant of SDK) */
+    hap_enable_mfi_auth(HAP_MFI_AUTH_HW);
+
+    /* Initialize Wi-Fi */
+    //app_wifi_init();
+
+    /* Register an event handler for HomeKit specific events.
+     * All event handlers should be registered only after app_wifi_init()
+     */
+    esp_event_handler_register(HAP_EVENT, ESP_EVENT_ANY_ID, &hap_event_handler, NULL);
 
     /* After all the initializations are done, start the HAP core */
     hap_start();
@@ -490,4 +611,11 @@ void garage_door_serv()
         } 
     }
 
+}
+
+void watering_serv()
+{
+    configure_gpio();
+    xTaskCreate(watering_thread_entry, WATERING_TASK_NAME, WATERING_TASK_STACKSIZE, NULL, WATERING_TASK_PRIORITY, NULL);
+    vTaskDelete(NULL);
 }

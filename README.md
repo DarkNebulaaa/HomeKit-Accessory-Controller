@@ -1,4 +1,4 @@
-# HomeKit Garage Door Opener
+# HomeKit Accessory Controller
 
 ESP32C3-based Apple HomeKit Accessory controller using ESP-IDF and FreeRTOS.
 

@@ -1,12 +1,12 @@
 # HomeKit Garage Door Opener
 
-ESP32C3-based Apple HomeKit garage door controller using ESP-IDF and FreeRTOS.
+ESP32C3-based Apple HomeKit Accessory controller using ESP-IDF and FreeRTOS.
 
 ---
 
 ## Overview
 
-This project implements a HomeKit-compatible garage door opener built on ESP32C3.
+This project implements a HomeKit-compatible garage door opener & watering system built on ESP32C3.
 
 ---
 

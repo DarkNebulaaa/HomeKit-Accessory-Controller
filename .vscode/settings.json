@@ -10,6 +10,6 @@
     "IDF_TARGET": "esp32c3"
   },
   "idf.port": "/dev/tty.usbmodem21201",
-  "idf.flashType": "JTAG",
+  "idf.flashType": "UART",
   "idf.currentSetup": "/Users/masonhon/esp/v5.4.2/esp-idf"
 }

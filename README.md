@@ -98,8 +98,21 @@ Once paired successfully, the device is ready to use in the Apple Home app.
 
 ---
 
-## WiFi Setup Page
+## About Irrigation System
 
+Because the native HomeKit Valve accessory category does not support automation actions, a workaround was implemented to preserve the correct device icon while enabling automation support.
+
+An additional Outlet service was added at the underlying service layer. The Outlet state is synchronized with the Valve service to ensure consistent behavior.
+
+As shown in the image:
+- Sliding the Valve control panel (left side) does not trigger any action.
+- Sliding the Outlet control panel (right side) will activate the device, and the Valve state will update accordingly.
+
+This design allows automation to be handled through the Outlet service while maintaining the appropriate Valve icon in the Home app interface.
+
+<p align="center">
+    <img src="img/homekit app.jpg" width="48%">
+</p> 
 
 
 ## Assembled Board

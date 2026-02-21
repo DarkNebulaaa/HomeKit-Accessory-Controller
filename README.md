@@ -30,7 +30,7 @@ idf.py flash
 
 <p align="center">
   <img src="img/wifi_setup_page1.jpg" width="48%">
-  <img src="img/wifi_setup_page2.jpeg" width="48%">
+  <img src="img/wifi_setup_page2.jpg" width="48%">
 </p>
 
 ## Assembled Board

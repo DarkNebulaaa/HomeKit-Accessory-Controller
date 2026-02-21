@@ -50,6 +50,16 @@ static void led_blink(uint8_t R, uint8_t G, uint8_t B){
     vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
+static void led_onoff(bool onoff){
+    if (onoff){
+        led_strip_set_pixel(led_strip, 0, 0, 255, 0);
+        led_strip_refresh(led_strip);
+    }else{
+        led_strip_set_pixel(led_strip, 0, 255, 0, 0);
+        led_strip_refresh(led_strip);
+    }
+
+}
 
 static void configure_gpio(){
     ESP_LOGI(TAG, "configured GPIO DONE");
@@ -276,6 +286,7 @@ static void hap_event_handler(void* arg, esp_event_base_t event_base, int32_t ev
     if (!strcmp(hap_char_get_type_uuid(hc), HAP_CHAR_UUID_ON)){
         hap_val_t new_val;
         new_val.b = gpio_get_level(PLUGIN_GPIO);
+        led_onoff(new_val.b);
         hap_char_update_val(hc, &new_val);
         *status_code = HAP_STATUS_SUCCESS;
     }
@@ -334,6 +345,7 @@ static int watering_write(hap_write_data_t write_data[], int count, void *serv_p
         if (!strcmp(hap_char_get_type_uuid(write->hc), HAP_CHAR_UUID_ON)) {
             ESP_LOGI(TAG, "Received Write. Watering state %s",write->val.b ? "On" : "Off");
             gpio_set_level(PLUGIN_GPIO, write->val.b);
+            led_onoff(write->val.b);
             hap_char_update_val(write->hc, &(write->val));
             hap_char_update_val(current_watering_state_char, &(write->val));
             *(write->status) = HAP_STATUS_SUCCESS;

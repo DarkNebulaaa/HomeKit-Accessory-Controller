@@ -35,7 +35,7 @@ Follow the steps below to configure and pair the device with Apple Home.
 
    On your phone or computer, connect to the Wi-Fi network:
    
-	 - SSID: HOMEKIT_ACCESSORY_CONTROLLER
+	 - SSID: Homekit_Accessory_Controller
    
 	 - Password: hap_esp32
   

@@ -72,6 +72,11 @@ or
    Tap Save & Connect.
 
    The device will automatically reboot and switch to STA (Station) mode, connecting to your home Wi-Fi network.
+<p align="center">
+  <img src="img/wifi_setup_page1.jpg" width="48%">
+  <img src="img/wifi_setup_page2.jpg" width="48%">
+</p>
+
 
 ---
 6. Add the Device in Apple Home
@@ -95,10 +100,7 @@ Once paired successfully, the device is ready to use in the Apple Home app.
 
 ## WiFi Setup Page
 
-<p align="center">
-  <img src="img/wifi_setup_page1.jpg" width="48%">
-  <img src="img/wifi_setup_page2.jpg" width="48%">
-</p>
+
 
 ## Assembled Board
 <p align="center">

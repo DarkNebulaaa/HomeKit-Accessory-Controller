@@ -53,9 +53,12 @@
 #include "user_nvs.h"
 #include "config.h"
 #include "user_web.h"
+
 const char *TAG = "HAP Garage Door";
 int i = 0;
 WifiMode_t RFmode;
+
+
 void configure_led(void){
     led_strip_config_t strip_config = {
         .strip_gpio_num = IO_INDECATOR,
@@ -68,6 +71,7 @@ void configure_led(void){
     ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
     led_strip_clear(led_strip);
 }
+
 void led_pwm(void *mode){
     WifiMode_t *RFmode = (WifiMode_t *)mode;
     static int direction = 0;
@@ -88,6 +92,7 @@ void led_pwm(void *mode){
     vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
+
 void app_main()
 {   
     configure_gpio();

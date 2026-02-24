@@ -5,6 +5,7 @@
 #include "stdio.h"
 led_strip_handle_t led_strip;
 DoorState State, Priv_State;
+WateringState Watering_State;
 //指示燈初始化
 
 static void garage_door_led(){
@@ -84,6 +85,7 @@ void configure_gpio(){
     // 澆水系統腳位初始化
     gpio_reset_pin(PLUGIN_GPIO);
     gpio_set_direction(PLUGIN_GPIO, GPIO_MODE_OUTPUT);
+    gpio_set_pull_mode(PLUGIN_GPIO, GPIO_PULLUP_PULLDOWN);
     gpio_set_level(PLUGIN_GPIO, 0);
 
 }
@@ -280,26 +282,27 @@ static void hap_event_handler(void* arg, esp_event_base_t event_base, int32_t ev
     }
     if (!strcmp(hap_char_get_type_uuid(hc), HAP_CHAR_UUID_OUTLET_IN_USE)) {
         hap_val_t new_val;
-        new_val.b = gpio_get_level(PLUGIN_GPIO);
+        new_val.b = Watering_State == On ? true : false;
         hap_char_update_val(hc, &new_val);
         *status_code = HAP_STATUS_SUCCESS;
     }
     if (!strcmp(hap_char_get_type_uuid(hc), HAP_CHAR_UUID_ON)){
         hap_val_t new_val;
-        new_val.b = gpio_get_level(PLUGIN_GPIO);
+        new_val.b = Watering_State == On ? true : false;
+        ESP_LOGI(TAG, "Read data !! GPIO Level %d", new_val.b);
         led_onoff(new_val.b);
         hap_char_update_val(hc, &new_val);
         *status_code = HAP_STATUS_SUCCESS;
     }
     if (!strcmp(hap_char_get_type_uuid(hc), HAP_CHAR_UUID_IN_USE)){
         hap_val_t new_val;
-        new_val.b = gpio_get_level(PLUGIN_GPIO);
-        hap_char_update_val(hc, &new_val);
+        new_val.b = Watering_State == On ? true : false;;
+        //hap_char_update_val(hc, &new_val);
         *status_code = HAP_STATUS_SUCCESS;
     }
     if (!strcmp(hap_char_get_type_uuid(hc), HAP_CHAR_UUID_ACTIVE)){
         hap_val_t new_val;
-        new_val.b = gpio_get_level(PLUGIN_GPIO);
+        new_val.b = Watering_State == On ? true : false;
         hap_char_update_val(hc, &new_val);
         *status_code = HAP_STATUS_SUCCESS;
     }
@@ -346,26 +349,28 @@ static int watering_write(hap_write_data_t write_data[], int count, void *serv_p
         if (!strcmp(hap_char_get_type_uuid(write->hc), HAP_CHAR_UUID_ON)) {
             ESP_LOGI(TAG, "Received Write. Watering state %s",write->val.b ? "On" : "Off");
             gpio_set_level(PLUGIN_GPIO, write->val.b);
+            Watering_State = write->val.b ? On : Off;
             led_onoff(write->val.b);
             hap_char_update_val(write->hc, &(write->val));
             hap_char_update_val(current_watering_state_char, &(write->val));
             *(write->status) = HAP_STATUS_SUCCESS;
         }
         if (!strcmp(hap_char_get_type_uuid(write->hc), HAP_CHAR_UUID_OUTLET_IN_USE)){
+            ESP_LOGI(TAG, "HAP_CHAR_UUID_OUTLET_IN_USE %s",write->val.b ? "On" : "Off");
             hap_val_t new_val;
-            new_val.b = gpio_get_level(PLUGIN_GPIO);
+            new_val.b = Watering_State == On ? true : false;
             hap_char_update_val(write->hc, &new_val);
             *(write->status) = HAP_STATUS_SUCCESS;
         }
         if (!strcmp(hap_char_get_type_uuid(write->hc), HAP_CHAR_UUID_IN_USE)){
             hap_val_t new_val;
-            new_val.b = gpio_get_level(PLUGIN_GPIO);
+            new_val.b = Watering_State == On ? true : false;
             hap_char_update_val(write->hc, &new_val);
             *(write->status) = HAP_STATUS_SUCCESS;
         }
         if (!strcmp(hap_char_get_type_uuid(write->hc), HAP_CHAR_UUID_ACTIVE)){
             hap_val_t new_val;
-            new_val.b = gpio_get_level(PLUGIN_GPIO);
+            new_val.b = Watering_State == On ? true : false;
             hap_char_update_val(write->hc, &new_val);
             *(write->status) = HAP_STATUS_SUCCESS;
         }
@@ -629,7 +634,6 @@ void garage_door_serv()
     state_Changed = 1;
     xTaskCreate(garage_door_thread_entry, GARAGE_DOOR_TASK_NAME, GARAGE_DOOR_TASK_STACKSIZE, NULL, GARAGE_DOOR_TASK_PRIORITY, NULL);
     while (1){  
-        //vTaskDelay(3000/portTICK_PERIOD_MS);
         hap_val_t data, t_data;
         State = get_door_state();
         if (State != Priv_State){
@@ -688,5 +692,11 @@ void garage_door_serv()
 void watering_serv()
 {
     xTaskCreate(watering_thread_entry, WATERING_TASK_NAME, WATERING_TASK_STACKSIZE, NULL, WATERING_TASK_PRIORITY, NULL);
+    while (1)
+    {
+       gpio_set_level(PLUGIN_GPIO, Watering_State == On ? 1 : 0);
+       vTaskDelay(500/portTICK_PERIOD_MS);
+    }
+    
     vTaskDelete(NULL);
 }

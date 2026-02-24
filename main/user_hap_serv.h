@@ -50,6 +50,10 @@ enum door_state {
     Stopped
 };
 
+typedef enum OnOff {
+    Off = 0,
+    On
+} WateringState;
 
 typedef enum door_cmd DoorCmd;
 typedef enum door_state DoorState;
